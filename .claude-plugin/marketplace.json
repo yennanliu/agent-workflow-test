@@ -1,0 +1,23 @@
+{
+  "name": "agent-workflow",
+  "owner": {
+    "name": "yennanliu"
+  },
+  "metadata": {
+    "description": "Agent skills for running software projects end to end, from spec to e2e test",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "dev-flow",
+      "source": "./plugins/dev-flow",
+      "description": "A ten-stage software dev workflow for coding agents: grill, spec, interface, design, tickets, implement, harden, validate, deploy, e2e, retro",
+      "version": "0.1.0",
+      "author": {
+        "name": "yennanliu"
+      },
+      "category": "development",
+      "keywords": ["workflow", "tdd", "spec", "code-review", "deployment", "e2e", "skills"]
+    }
+  ]
+}

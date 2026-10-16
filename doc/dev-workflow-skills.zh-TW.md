@@ -60,7 +60,7 @@ flowchart TB
 
 ## Skill 檔案
 
-以下新增的階段 skill 是草稿，複製到 `.claude/skills/<name>/SKILL.md` 後，再依實際執行結果修剪。階段 1、4、5、10 直接沿用 Pocock 的 skill（`grill-with-docs`、`to-spec`、`to-tickets`、`implement`、`retro`）。skill 內容保留英文，因為 agent 讀英文指示最穩定。
+以下草稿用來說明每個新階段背後的想法。可安裝、修訂過的版本在 [`plugins/dev-flow/skills/`](../plugins/dev-flow/skills/)：不綁定特定專案（指令來自 `docs/dev-flow/config.md`），也不依賴其他套件，內含自己的 `grilling`、`tdd`、`code-review`、`codebase-design`。skill 內容保留英文。
 
 ### `/to-interface`（階段 2）
 
@@ -210,8 +210,8 @@ src/  tests/  e2e/             # 階段 2、5、6、9
 
 一次加一個階段，先從能修正你已經看到的問題的那幾個開始。
 
-1. 安裝 Pocock 的 skill：`claude plugin install mattpocock-skills@claude-plugins-official`，接著每個 repo 跑一次 `/setup-matt-pocock-skills`。
-2. 把上面的草稿 skill 複製到 `.claude/skills/`，並加上 `/dev-flow`，你只需要記得一個名字。
+1. 安裝打包好的工作流程：`/plugin marketplace add yennanliu/agent-workflow-test`，接著 `/plugin install dev-flow@agent-workflow`。它不依賴其他套件，Pocock 的 skill 可裝可不裝。指令都有前綴：`/dev-flow:spec`、`/dev-flow:implement` 等（見 [README](../README.zh-TW.md)）。
+2. 每個 repo 跑一次 `/dev-flow:setup`；不確定下一步時跑 `/dev-flow:next`。
 3. 拿一個真實功能完整跑一次流程。讀 reasoning trace，把沒有改變行為的每一行刪掉。
 4. 功能完成後跑 `/retro`，把重複出現的錯誤變成檢查（lint 規則、CI 步驟）或程式碼規範。
 

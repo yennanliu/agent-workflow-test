@@ -60,7 +60,7 @@ A failing stage loops back, never forward: a failed e2e journey becomes a new ti
 
 ## Skill files
 
-The new stage skills below are drafts to copy into `.claude/skills/<name>/SKILL.md` and then prune against real runs. Stages 1, 4, 5 and 10 reuse Pocock's skills as they are (`grill-with-docs`, `to-spec`, `to-tickets`, `implement`, `retro`).
+The drafts below explain the idea behind each new stage. The installable, refined versions live in [`plugins/dev-flow/skills/`](../plugins/dev-flow/skills/). They are project-agnostic (commands come from `docs/dev-flow/config.md`) and self-contained, with their own `grilling`, `tdd`, `code-review` and `codebase-design`.
 
 ### `/to-interface` (stage 2)
 
@@ -210,8 +210,8 @@ The traceability chain in the second row is the backbone: each acceptance criter
 
 Add stages one at a time, starting with the ones that fix failures you already see.
 
-1. Install Pocock's skills: `claude plugin install mattpocock-skills@claude-plugins-official`, then `/setup-matt-pocock-skills` once per repo.
-2. Copy the draft skills above into `.claude/skills/`, and add `/dev-flow` so you only remember one name.
+1. Install the packaged workflow: `/plugin marketplace add yennanliu/agent-workflow-test`, then `/plugin install dev-flow@agent-workflow`. It is self-contained, so Pocock's skills are optional. Commands are namespaced: `/dev-flow:spec`, `/dev-flow:implement`, and so on (see the [README](../README.md)).
+2. Run `/dev-flow:setup` once per repo, and `/dev-flow:next` whenever you're unsure which stage comes next.
 3. Run one real feature through the full flow. Read the reasoning traces and prune every line that didn't change behaviour.
 4. After the feature, run `/retro` and turn repeated mistakes into checks (lint rules, CI steps) or coding standards.
 

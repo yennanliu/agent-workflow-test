@@ -1,0 +1,10 @@
+{
+  "name": "dev-flow",
+  "description": "A ten-stage software dev workflow for coding agents: grill, spec, interface, design, tickets, implement, harden, validate, deploy, e2e, retro",
+  "version": "0.1.0",
+  "author": {
+    "name": "yennanliu"
+  },
+  "homepage": "https://github.com/yennanliu/agent-workflow-test",
+  "keywords": ["workflow", "tdd", "spec", "code-review", "deployment", "e2e", "skills"]
+}
