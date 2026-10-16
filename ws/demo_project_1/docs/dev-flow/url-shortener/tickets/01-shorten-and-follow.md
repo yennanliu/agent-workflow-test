@@ -1,4 +1,4 @@
-Status: todo
+Status: done
 
 # 01 Shorten and follow (tracer bullet)
 
