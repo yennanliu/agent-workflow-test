@@ -59,8 +59,8 @@ def make_server(
             body = self._read_json()
             if not isinstance(body, dict) or "url" not in body:
                 raise BadRequest('body must be a JSON object with a "url" field')
-            link, _ = service.shorten(body["url"])
-            self._json(201, {"code": link.code, "short_url": f"{root()}/{link.code}", "url": link.url})
+            link, created = service.shorten(body["url"])
+            self._json(201 if created else 200, {"code": link.code, "short_url": f"{root()}/{link.code}", "url": link.url})
 
         def _read_json(self) -> Any:
             try:

@@ -26,6 +26,14 @@ class ShortenAndFollowOverHttp(HttpCase):
         self.assertEqual(self.s.request("GET", "/healthz")[::2], (200, {"status": "ok"}))
 
 
+class IdempotentOverHttp(HttpCase):
+    def test_second_post_is_200_with_same_code(self) -> None:
+        first = self.s.request("POST", "/links", {"url": "https://example.com/again"})
+        second = self.s.request("POST", "/links", {"url": "https://example.com/again"})
+        self.assertEqual((first[0], second[0]), (201, 200))
+        self.assertEqual(first[2], second[2])
+
+
 class ErrorsOverHttp(HttpCase):
     def test_bad_url_is_400_json(self) -> None:
         status, _, body = self.s.request("POST", "/links", {"url": "javascript:alert(1)"})

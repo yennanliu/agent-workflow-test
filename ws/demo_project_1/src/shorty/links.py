@@ -14,11 +14,12 @@ from urllib.parse import urlsplit
 ALPHABET = string.digits + string.ascii_letters
 CODE_LENGTH = 7
 MAX_URL_LENGTH = 2048
+MAX_CODE_ATTEMPTS = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS links (
     code TEXT PRIMARY KEY,
-    url TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL,
     hits INTEGER NOT NULL DEFAULT 0
 )
@@ -78,13 +79,25 @@ class LinkService:
 
     def shorten(self, url: str) -> tuple[Link, bool]:
         """Return the link for `url` and whether it was just created."""
-        link = Link(self._new_code(), validate_url(url), self._clock(), 0)
+        url = validate_url(url)
         with self._lock, self._db:
-            self._db.execute(
-                "INSERT INTO links (code, url, created_at) VALUES (?, ?, ?)",
-                (link.code, link.url, link.created_at),
-            )
-        return link, True
+            if existing := self._by_url(url):
+                return existing, False
+            created_at = self._clock()
+            for _ in range(MAX_CODE_ATTEMPTS):
+                code = self._new_code()
+                try:
+                    self._db.execute(
+                        "INSERT INTO links (code, url, created_at) VALUES (?, ?, ?)",
+                        (code, url, created_at),
+                    )
+                except sqlite3.IntegrityError:
+                    # Another process may have stored this URL; otherwise the code was taken.
+                    if existing := self._by_url(url):
+                        return existing, False
+                    continue
+                return Link(code, url, created_at, 0), True
+        raise RuntimeError(f"no free code after {MAX_CODE_ATTEMPTS} attempts")
 
     def follow(self, code: str) -> Link:
         """Record one hit and return the link."""
@@ -98,6 +111,12 @@ class LinkService:
         if row is None:
             raise LinkNotFound(code)
         return Link(*row)
+
+    def _by_url(self, url: str) -> Link | None:
+        row = self._db.execute(
+            "SELECT code, url, created_at, hits FROM links WHERE url = ?", (url,)
+        ).fetchone()
+        return Link(*row) if row else None
 
     def close(self) -> None:
         self._db.close()

@@ -1,4 +1,4 @@
-Status: todo
+Status: done
 
 # 03 Idempotent shorten
 

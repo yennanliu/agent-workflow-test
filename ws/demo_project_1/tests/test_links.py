@@ -33,6 +33,28 @@ class ShortenAndFollow(LinkServiceCase):
         self.assertEqual(self.svc.follow(link.code).url, "https://example.com/y")
 
 
+class Idempotent(LinkServiceCase):
+    def test_same_url_returns_same_link(self) -> None:
+        first, created_first = self.svc.shorten("https://example.com/same")
+        second, created_second = self.svc.shorten("https://example.com/same")
+        self.assertEqual((created_first, created_second), (True, False))
+        self.assertEqual(first.code, second.code)
+
+    def test_code_collision_retries_with_new_code(self) -> None:
+        codes = iter(["AAAAAAA", "AAAAAAA", "BBBBBBB"])
+        svc = LinkService(self.db, new_code=lambda: next(codes))
+        self.addCleanup(svc.close)
+        self.assertEqual(svc.shorten("https://example.com/1")[0].code, "AAAAAAA")
+        self.assertEqual(svc.shorten("https://example.com/2")[0].code, "BBBBBBB")
+
+    def test_gives_up_after_five_collisions(self) -> None:
+        svc = LinkService(self.db, new_code=lambda: "CCCCCCC")
+        self.addCleanup(svc.close)
+        svc.shorten("https://example.com/first")
+        with self.assertRaises(RuntimeError):
+            svc.shorten("https://example.com/second")
+
+
 class Errors(LinkServiceCase):
     def test_rejects_bad_urls(self) -> None:
         for url in ["", "javascript:alert(1)", "ftp://example.com", "https://", "example.com",
