@@ -80,6 +80,10 @@ Small changes skip stages: a bug fix runs `grill → implement → validate → 
 
 Four model-invoked skills hold the shared discipline and are called by the stages: `grilling`, `tdd`, `code-review`, `codebase-design`. The whole plugin adds about 800 tokens to each session.
 
+## Example
+
+[`ws/demo_project_1`](ws/demo_project_1/) is a small URL shortener built through every stage of the workflow, with each stage's artifact committed. Its two-axis review caught a header-injection bug and four other blocking issues, and its staging rollback drill caught a bug in its own deploy script.
+
 ## How it's designed
 
 - [How to Build Your Own Agent Skill](doc/how-to-build-agent-skill.md) ([中文](doc/how-to-build-agent-skill.zh-TW.md)): the principles, based on Matt Pocock's [skills](https://github.com/mattpocock/skills).
