@@ -5,7 +5,7 @@ import re
 import tempfile
 import unittest
 
-from shorty.links import LinkService
+from shorty.links import InvalidURL, LinkNotFound, LinkService
 
 
 class LinkServiceCase(unittest.TestCase):
@@ -31,6 +31,22 @@ class ShortenAndFollow(LinkServiceCase):
     def test_follow_returns_target(self) -> None:
         link, _ = self.svc.shorten("https://example.com/y")
         self.assertEqual(self.svc.follow(link.code).url, "https://example.com/y")
+
+
+class Errors(LinkServiceCase):
+    def test_rejects_bad_urls(self) -> None:
+        for url in ["", "javascript:alert(1)", "ftp://example.com", "https://", "example.com",
+                    "https://example.com/" + "a" * 2048, 42, None]:
+            with self.subTest(url=url), self.assertRaises(InvalidURL):
+                self.svc.shorten(url)  # type: ignore[arg-type]
+
+    def test_accepts_url_at_2048_chars(self) -> None:
+        url = "https://example.com/" + "a" * (2048 - len("https://example.com/"))
+        self.assertEqual(self.svc.shorten(url)[0].url, url)
+
+    def test_unknown_code_raises_not_found(self) -> None:
+        with self.assertRaises(LinkNotFound):
+            self.svc.follow("zzzzzzz")
 
 
 if __name__ == "__main__":

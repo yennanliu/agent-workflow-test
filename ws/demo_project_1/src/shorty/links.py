@@ -9,9 +9,11 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 ALPHABET = string.digits + string.ascii_letters
 CODE_LENGTH = 7
+MAX_URL_LENGTH = 2048
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS links (
@@ -43,6 +45,18 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def validate_url(url: object) -> str:
+    """Return `url` if it can be shortened, else raise InvalidURL."""
+    if not isinstance(url, str) or not url:
+        raise InvalidURL("url must be a non-empty string")
+    if len(url) > MAX_URL_LENGTH:
+        raise InvalidURL(f"url must be at most {MAX_URL_LENGTH} characters")
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise InvalidURL("url must be an http or https URL with a host")
+    return url
+
+
 def _random_code() -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(CODE_LENGTH))
 
@@ -64,7 +78,7 @@ class LinkService:
 
     def shorten(self, url: str) -> tuple[Link, bool]:
         """Return the link for `url` and whether it was just created."""
-        link = Link(self._new_code(), url, self._clock(), 0)
+        link = Link(self._new_code(), validate_url(url), self._clock(), 0)
         with self._lock, self._db:
             self._db.execute(
                 "INSERT INTO links (code, url, created_at) VALUES (?, ?, ?)",
@@ -74,14 +88,16 @@ class LinkService:
 
     def follow(self, code: str) -> Link:
         """Record one hit and return the link."""
+        return self.stats(code)
+
+    def stats(self, code: str) -> Link:
         with self._lock:
             row = self._db.execute(
                 "SELECT code, url, created_at, hits FROM links WHERE code = ?", (code,)
             ).fetchone()
+        if row is None:
+            raise LinkNotFound(code)
         return Link(*row)
-
-    def stats(self, code: str) -> Link:
-        raise NotImplementedError
 
     def close(self) -> None:
         self._db.close()

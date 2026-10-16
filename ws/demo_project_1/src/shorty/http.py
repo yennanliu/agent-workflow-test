@@ -3,10 +3,26 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from shorty.links import LinkService
+from shorty.links import InvalidURL, Link, LinkNotFound, LinkService
+
+MAX_BODY_BYTES = 8 * 1024
+CODE_PATH = re.compile(r"^/([0-9A-Za-z]+)$")
+STATS_PATH = re.compile(r"^/links/([0-9A-Za-z]+)$")
+
+log = logging.getLogger("shorty")
+
+
+class BadRequest(Exception):
+    pass
+
+
+class NotFound(Exception):
+    pass
 
 
 def make_server(
@@ -16,19 +32,58 @@ def make_server(
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            if self.path == "/healthz":
-                return self._json(200, {"status": "ok"})
-            link = service.follow(self.path[1:])
-            self.send_response(302)
-            self.send_header("Location", link.url)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
+            self._handle(self._get)
 
         def do_POST(self) -> None:
-            length = int(self.headers.get("Content-Length") or 0)
-            body = json.loads(self.rfile.read(length))
+            self._handle(self._post)
+
+        def _get(self) -> None:
+            path = self.path.split("?", 1)[0]
+            if path == "/healthz":
+                return self._json(200, {"status": "ok"})
+            if match := STATS_PATH.match(path):
+                link = service.stats(match.group(1))
+                return self._json(200, _stats(link))
+            if match := CODE_PATH.match(path):
+                link = service.follow(match.group(1))
+                self.send_response(302)
+                self.send_header("Location", link.url)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return None
+            raise NotFound("no such route")
+
+        def _post(self) -> None:
+            if self.path.split("?", 1)[0] != "/links":
+                raise NotFound("no such route")
+            body = self._read_json()
+            if not isinstance(body, dict) or "url" not in body:
+                raise BadRequest('body must be a JSON object with a "url" field')
             link, _ = service.shorten(body["url"])
             self._json(201, {"code": link.code, "short_url": f"{root()}/{link.code}", "url": link.url})
+
+        def _read_json(self) -> Any:
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise BadRequest("invalid Content-Length") from None
+            if length > MAX_BODY_BYTES:
+                raise BadRequest(f"body must be at most {MAX_BODY_BYTES} bytes")
+            try:
+                return json.loads(self.rfile.read(length) or b"null")
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise BadRequest("body must be valid JSON") from None
+
+        def _handle(self, route: Any) -> None:
+            try:
+                route()
+            except (BadRequest, InvalidURL) as exc:
+                self._json(400, {"error": str(exc)})
+            except (NotFound, LinkNotFound):
+                self._json(404, {"error": "not found"})
+            except Exception:
+                log.exception("unhandled error on %s %s", self.command, self.path)
+                self._json(500, {"error": "internal error"})
 
         def _json(self, status: int, payload: Any) -> None:
             data = json.dumps(payload).encode()
@@ -39,7 +94,7 @@ def make_server(
             self.wfile.write(data)
 
         def log_message(self, format: str, *args: Any) -> None:
-            pass
+            log.info("%s %s", self.address_string(), format % args)
 
     server = ThreadingHTTPServer((host, port), Handler)
 
@@ -50,3 +105,7 @@ def make_server(
         return f"http://{bound_host}:{bound_port}"
 
     return server
+
+
+def _stats(link: Link) -> dict[str, Any]:
+    return {"code": link.code, "url": link.url, "created_at": link.created_at, "hits": link.hits}
