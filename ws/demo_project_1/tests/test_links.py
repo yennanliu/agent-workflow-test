@@ -55,6 +55,30 @@ class Idempotent(LinkServiceCase):
             svc.shorten("https://example.com/second")
 
 
+class Hits(LinkServiceCase):
+    def test_each_follow_adds_one_hit(self) -> None:
+        link, _ = self.svc.shorten("https://example.com/h")
+        self.assertEqual(self.svc.follow(link.code).hits, 1)
+        self.assertEqual(self.svc.follow(link.code).hits, 2)
+        self.assertEqual(self.svc.stats(link.code).hits, 2)
+
+    def test_stats_does_not_add_a_hit(self) -> None:
+        link, _ = self.svc.shorten("https://example.com/s")
+        self.svc.stats(link.code)
+        self.assertEqual(self.svc.stats(link.code).hits, 0)
+
+    def test_concurrent_follows_lose_no_hits(self) -> None:
+        import threading
+
+        link, _ = self.svc.shorten("https://example.com/c")
+        threads = [threading.Thread(target=self.svc.follow, args=(link.code,)) for _ in range(50)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(self.svc.stats(link.code).hits, 50)
+
+
 class Errors(LinkServiceCase):
     def test_rejects_bad_urls(self) -> None:
         for url in ["", "javascript:alert(1)", "ftp://example.com", "https://", "example.com",

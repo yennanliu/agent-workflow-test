@@ -101,7 +101,15 @@ class LinkService:
 
     def follow(self, code: str) -> Link:
         """Record one hit and return the link."""
-        return self.stats(code)
+        with self._lock, self._db:
+            row = self._db.execute(
+                "UPDATE links SET hits = hits + 1 WHERE code = ? "
+                "RETURNING code, url, created_at, hits",
+                (code,),
+            ).fetchone()
+        if row is None:
+            raise LinkNotFound(code)
+        return Link(*row)
 
     def stats(self, code: str) -> Link:
         with self._lock:

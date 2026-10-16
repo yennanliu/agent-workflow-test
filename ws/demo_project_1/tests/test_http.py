@@ -34,6 +34,17 @@ class IdempotentOverHttp(HttpCase):
         self.assertEqual(first[2], second[2])
 
 
+class StatsOverHttp(HttpCase):
+    def test_stats_show_hits_after_follows(self) -> None:
+        code = self.s.request("POST", "/links", {"url": "https://example.com/st"})[2]["code"]
+        self.s.request("GET", "/" + code)
+        self.s.request("GET", "/" + code)
+        status, _, body = self.s.request("GET", "/links/" + code)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["hits"], 2)
+        self.assertEqual(set(body), {"code", "url", "created_at", "hits"})
+
+
 class ErrorsOverHttp(HttpCase):
     def test_bad_url_is_400_json(self) -> None:
         status, _, body = self.s.request("POST", "/links", {"url": "javascript:alert(1)"})
