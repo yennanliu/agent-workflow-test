@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import socket
 import unittest
 
 from tests.support import RunningServer
@@ -61,6 +62,7 @@ class ErrorsOverHttp(HttpCase):
     def test_oversized_body_is_400(self) -> None:
         status, _, body = self.s.request("POST", "/links", raw=b"x" * 9000)
         self.assertEqual(status, 400)
+        self.assertIn("error", body)
 
     def test_unknown_code_and_route_are_404_json(self) -> None:
         for method, path in (("GET", "/zzzzzzz"), ("GET", "/links/zzzzzzz"), ("POST", "/nope")):
@@ -68,6 +70,43 @@ class ErrorsOverHttp(HttpCase):
                 status, _, body = self.s.request(method, path, {} if method == "POST" else None)
                 self.assertEqual(status, 404)
                 self.assertIn("error", body)
+
+
+class ReviewFixes(HttpCase):
+    def raw(self, request: bytes) -> bytes:
+        with socket.create_connection(("127.0.0.1", self.s.port), timeout=3) as sock:
+            sock.sendall(request)
+            chunks = []
+            while chunk := sock.recv(4096):
+                chunks.append(chunk)
+        return b"".join(chunks)
+
+    def test_crlf_target_cannot_inject_headers(self) -> None:
+        status, _, _ = self.s.request("POST", "/links", {"url": "https://example.com/a\r\nSet-Cookie: pwn=1"})
+        self.assertEqual(status, 400)
+
+    def test_non_ascii_target_redirects_percent_encoded(self) -> None:
+        body = self.s.request("POST", "/links", {"url": "https://example.com/日本"})[2]
+        status, headers, _ = self.s.request("GET", "/" + body["code"])
+        self.assertEqual((status, headers["location"]), (302, "https://example.com/%E6%97%A5%E6%9C%AC"))
+
+    def test_negative_content_length_is_400(self) -> None:
+        reply = self.raw(b"POST /links HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\n\r\n")
+        self.assertTrue(reply.startswith(b"HTTP/1.0 400"), reply[:40])
+        self.assertIn(b'"error"', reply)
+
+    def test_unsupported_method_is_json(self) -> None:
+        for method in ("PUT", "DELETE", "PATCH"):
+            with self.subTest(method=method):
+                status, headers, body = self.s.request(method, "/links")
+                self.assertEqual(headers["content-type"], "application/json")
+                self.assertIn("error", body)
+                self.assertGreaterEqual(status, 400)
+
+    def test_malformed_request_line_is_json(self) -> None:
+        reply = self.raw(b"GARBAGE\r\n\r\n")
+        self.assertTrue(reply.startswith(b"HTTP/1.0 400"), reply[:40])
+        self.assertIn(b"application/json", reply)
 
 
 if __name__ == "__main__":

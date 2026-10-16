@@ -33,9 +33,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"shorty: {exc}", file=sys.stderr)
         return 1
 
+    signal.signal(signal.SIGTERM, _stop)
     host, port = server.server_address[:2]
     print(f"shorty listening on http://{host}:{port}", flush=True)
-    signal.signal(signal.SIGTERM, _stop)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

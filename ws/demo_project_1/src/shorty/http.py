@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Callable
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from shorty.links import InvalidURL, Link, LinkNotFound, LinkService
 
 MAX_BODY_BYTES = 8 * 1024
+SOCKET_TIMEOUT_SECONDS = 10
 CODE_PATH = re.compile(r"^/([0-9A-Za-z]+)$")
 STATS_PATH = re.compile(r"^/links/([0-9A-Za-z]+)$")
 
@@ -31,6 +34,8 @@ def make_server(
     """Serve POST /links, GET /{code}, GET /links/{code} and GET /healthz."""
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = SOCKET_TIMEOUT_SECONDS
+
         def do_GET(self) -> None:
             self._handle(self._get)
 
@@ -67,6 +72,8 @@ def make_server(
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 raise BadRequest("invalid Content-Length") from None
+            if length < 0:
+                raise BadRequest("invalid Content-Length")
             if length > MAX_BODY_BYTES:
                 raise BadRequest(f"body must be at most {MAX_BODY_BYTES} bytes")
             try:
@@ -74,7 +81,14 @@ def make_server(
             except (UnicodeDecodeError, json.JSONDecodeError):
                 raise BadRequest("body must be valid JSON") from None
 
-        def _handle(self, route: Any) -> None:
+        def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+            """JSON for the stdlib's own errors too (bad request line, unsupported method, …)."""
+            if self.request_version == "HTTP/0.9":
+                self.request_version = "HTTP/1.0"
+            self.close_connection = True
+            self._json(code, {"error": message or HTTPStatus(code).phrase})
+
+        def _handle(self, route: Callable[[], None]) -> None:
             try:
                 route()
             except (BadRequest, InvalidURL) as exc:

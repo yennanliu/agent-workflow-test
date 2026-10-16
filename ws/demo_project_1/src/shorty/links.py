@@ -9,12 +9,14 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 ALPHABET = string.digits + string.ascii_letters
 CODE_LENGTH = 7
 MAX_URL_LENGTH = 2048
 MAX_CODE_ATTEMPTS = 5
+# Every printable ASCII character is left as is; only non-ASCII gets percent-encoded.
+PRINTABLE_ASCII = "".join(chr(c) for c in range(0x21, 0x7F))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS links (
@@ -47,9 +49,14 @@ def _utc_now() -> str:
 
 
 def validate_url(url: object) -> str:
-    """Return `url` if it can be shortened, else raise InvalidURL."""
+    """Return `url` as a safe ASCII URL, or raise InvalidURL."""
     if not isinstance(url, str) or not url:
         raise InvalidURL("url must be a non-empty string")
+    if any(ch <= " " or ch == "\x7f" for ch in url):
+        raise InvalidURL("url must not contain spaces or control characters")
+    if not urlsplit(url).netloc.isascii():
+        raise InvalidURL("url host must be ASCII; use its punycode form")
+    url = quote(url, safe=PRINTABLE_ASCII)
     if len(url) > MAX_URL_LENGTH:
         raise InvalidURL(f"url must be at most {MAX_URL_LENGTH} characters")
     parts = urlsplit(url)

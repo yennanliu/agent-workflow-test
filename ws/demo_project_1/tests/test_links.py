@@ -86,6 +86,20 @@ class Errors(LinkServiceCase):
             with self.subTest(url=url), self.assertRaises(InvalidURL):
                 self.svc.shorten(url)  # type: ignore[arg-type]
 
+    def test_rejects_control_characters_and_spaces(self) -> None:
+        for url in ["https://example.com/a\r\nSet-Cookie: x=1", "https://example.com/\tb",
+                    " https://example.com/", "https://exa mple.com/", "https://example.com/\x7f"]:
+            with self.subTest(url=url), self.assertRaises(InvalidURL):
+                self.svc.shorten(url)
+
+    def test_percent_encodes_non_ascii_path(self) -> None:
+        link, _ = self.svc.shorten("https://example.com/日本?q=é")
+        self.assertEqual(link.url, "https://example.com/%E6%97%A5%E6%9C%AC?q=%C3%A9")
+
+    def test_rejects_non_ascii_host(self) -> None:
+        with self.assertRaises(InvalidURL):
+            self.svc.shorten("https://例え.jp/")
+
     def test_accepts_url_at_2048_chars(self) -> None:
         url = "https://example.com/" + "a" * (2048 - len("https://example.com/"))
         self.assertEqual(self.svc.shorten(url)[0].url, url)
