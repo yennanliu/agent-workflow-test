@@ -1,6 +1,6 @@
 # How to Build Your Own Agent Skill
 
-Oct 16, 2026 · [Live doc](https://claude.ai/code/artifact/7586a7b1-3d5b-4286-88bc-50563ddf4ed6)
+Oct 16, 2026 · [Live doc](https://claude.ai/code/artifact/7586a7b1-3d5b-4286-88bc-50563ddf4ed6) · [繁體中文版](how-to-build-agent-skill.zh-TW.md)
 
 ## 1. Why a skill exists
 
