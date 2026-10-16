@@ -103,6 +103,27 @@ class ReviewFixes(HttpCase):
                 self.assertIn("error", body)
                 self.assertGreaterEqual(status, 400)
 
+    def test_unsafe_stored_target_is_410_without_location(self) -> None:
+        import sqlite3
+
+        with sqlite3.connect(self.s.db_path) as db:
+            db.execute("INSERT INTO links (code, url, created_at) VALUES ('LEGACY2', ?, 'old')",
+                       ("https://example.com/a\r\nSet-Cookie: pwn=1",))
+        reply = self.raw(b"GET /LEGACY2 HTTP/1.1\r\nHost: x\r\n\r\n")
+        self.assertTrue(reply.startswith(b"HTTP/1.0 410"), reply[:40])
+        self.assertNotIn(b"Set-Cookie", reply)
+        self.assertNotIn(b"Location", reply)
+
+    def test_short_body_is_400(self) -> None:
+        reply = self.raw(b'POST /links HTTP/1.1\r\nHost: x\r\nContent-Length: 50\r\n\r\n{"url"')
+        self.assertTrue(reply.startswith(b"HTTP/1.0 400"), reply[:40])
+
+    def test_head_error_has_no_body(self) -> None:
+        reply = self.raw(b"HEAD /links HTTP/1.1\r\nHost: x\r\n\r\n")
+        head, _, body = reply.partition(b"\r\n\r\n")
+        self.assertTrue(head.startswith(b"HTTP/1.0 501"), head[:40])
+        self.assertEqual(body, b"")
+
     def test_malformed_request_line_is_json(self) -> None:
         reply = self.raw(b"GARBAGE\r\n\r\n")
         self.assertTrue(reply.startswith(b"HTTP/1.0 400"), reply[:40])

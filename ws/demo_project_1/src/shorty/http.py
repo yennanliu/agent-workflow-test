@@ -10,7 +10,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from shorty.links import InvalidURL, Link, LinkNotFound, LinkService
+from shorty.links import InvalidURL, Link, LinkNotFound, LinkService, UnsafeTarget
 
 MAX_BODY_BYTES = 8 * 1024
 SOCKET_TIMEOUT_SECONDS = 10
@@ -29,12 +29,16 @@ class NotFound(Exception):
 
 
 def make_server(
-    service: LinkService, host: str, port: int, base_url: str | None = None
+    service: LinkService,
+    host: str,
+    port: int,
+    base_url: str | None = None,
+    socket_timeout: float = SOCKET_TIMEOUT_SECONDS,
 ) -> ThreadingHTTPServer:
     """Serve POST /links, GET /{code}, GET /links/{code} and GET /healthz."""
 
     class Handler(BaseHTTPRequestHandler):
-        timeout = SOCKET_TIMEOUT_SECONDS
+        timeout = socket_timeout
 
         def do_GET(self) -> None:
             self._handle(self._get)
@@ -77,7 +81,11 @@ def make_server(
             if length > MAX_BODY_BYTES:
                 raise BadRequest(f"body must be at most {MAX_BODY_BYTES} bytes")
             try:
-                return json.loads(self.rfile.read(length) or b"null")
+                raw = self.rfile.read(length)
+            except TimeoutError:
+                raise BadRequest("body is shorter than Content-Length") from None
+            try:
+                return json.loads(raw or b"null")
             except (UnicodeDecodeError, json.JSONDecodeError):
                 raise BadRequest("body must be valid JSON") from None
 
@@ -95,6 +103,8 @@ def make_server(
                 self._json(400, {"error": str(exc)})
             except (NotFound, LinkNotFound):
                 self._json(404, {"error": "not found"})
+            except UnsafeTarget:
+                self._json(410, {"error": "this link's target is no longer allowed"})
             except Exception:
                 log.exception("unhandled error on %s %s", self.command, self.path)
                 self._json(500, {"error": "internal error"})
@@ -105,7 +115,8 @@ def make_server(
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(data)
+            if self.command != "HEAD":
+                self.wfile.write(data)
 
         def log_message(self, format: str, *args: Any) -> None:
             log.info("%s %s", self.address_string(), format % args)

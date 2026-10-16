@@ -21,7 +21,7 @@ class RunningServer:
             db_path = os.path.join(self._tmp.name, "shorty.db")
         self.db_path = db_path
         self.service = LinkService(db_path)
-        self.server = make_server(self.service, "127.0.0.1", 0)
+        self.server = make_server(self.service, "127.0.0.1", 0, socket_timeout=1.0)
         self.port = self.server.server_address[1]
         self._thread = threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True)
         self._thread.start()

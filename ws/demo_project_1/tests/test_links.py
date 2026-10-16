@@ -5,7 +5,7 @@ import re
 import tempfile
 import unittest
 
-from shorty.links import InvalidURL, LinkNotFound, LinkService
+from shorty.links import InvalidURL, LinkNotFound, LinkService, UnsafeTarget
 
 
 class LinkServiceCase(unittest.TestCase):
@@ -77,6 +77,20 @@ class Hits(LinkServiceCase):
         for t in threads:
             t.join()
         self.assertEqual(self.svc.stats(link.code).hits, 50)
+
+
+class LegacyRows(LinkServiceCase):
+    def insert_raw(self, code: str, url: str) -> None:
+        import sqlite3
+
+        with sqlite3.connect(self.db) as db:
+            db.execute("INSERT INTO links (code, url, created_at) VALUES (?, ?, 'old')", (code, url))
+
+    def test_unsafe_stored_target_raises_and_records_no_hit(self) -> None:
+        self.insert_raw("LEGACY1", "https://example.com/a\r\nSet-Cookie: pwn=1")
+        with self.assertRaises(UnsafeTarget):
+            self.svc.follow("LEGACY1")
+        self.assertEqual(self.svc.stats("LEGACY1").hits, 0)
 
 
 class Errors(LinkServiceCase):

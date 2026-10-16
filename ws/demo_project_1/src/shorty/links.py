@@ -44,6 +44,10 @@ class LinkNotFound(LookupError):
     """No link has this code."""
 
 
+class UnsafeTarget(LookupError):
+    """The stored target fails today's URL rules (written before they existed)."""
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -109,13 +113,19 @@ class LinkService:
     def follow(self, code: str) -> Link:
         """Record one hit and return the link."""
         with self._lock, self._db:
+            found = self._db.execute("SELECT url FROM links WHERE code = ?", (code,)).fetchone()
+            if found is None:
+                raise LinkNotFound(code)
+            try:
+                if validate_url(found[0]) != found[0]:
+                    raise UnsafeTarget(code)
+            except InvalidURL:
+                raise UnsafeTarget(code) from None
             row = self._db.execute(
                 "UPDATE links SET hits = hits + 1 WHERE code = ? "
                 "RETURNING code, url, created_at, hits",
                 (code,),
             ).fetchone()
-        if row is None:
-            raise LinkNotFound(code)
         return Link(*row)
 
     def stats(self, code: str) -> Link:

@@ -16,6 +16,11 @@ Run by `/dev-flow:validate` in a fresh subagent over the diff since `6e8fb60`, a
 | 9 | http.py:77 | `route: Any` should be `Callable[[], None]` | no | fixed |
 | 10 | links.py:102 | `UPDATE … RETURNING` needs SQLite ≥ 3.35, undocumented | no | documented in design.md |
 | 11 | test_http.py:61 | Oversized-body test doesn't assert the `error` key; findings 1–4 untested | no | fixed in ticket 06 |
+| 12 | http.py:50 | *Re-check:* findings 1–2 were only validated on write; rows stored before 06 still injected headers on follow, and deploys keep the database (reproduced) | yes | fixed in ticket 07 (410 Gone, no hit) |
+| 13 | http.py:73 | *Re-check:* body shorter than `Content-Length` timed out into a 500 | no | fixed in ticket 07 (400) |
+| 14 | http.py:send_error | *Re-check:* error replies to HEAD carried a body | no | fixed in ticket 07 |
+
+Re-check after ticket 06 (same reviewer): findings 1–4 fixed for new links; finding 12 raised. After ticket 07: 42/42 tests passing, no blocking finding open.
 
 ## Spec
 | AC | Verdict at review | Evidence |
