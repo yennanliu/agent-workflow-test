@@ -7,7 +7,6 @@ import unittest
 
 from tests.support import RunningServer
 
-PENDING = "pending: enabled by /dev-flow:harden"
 CODE = re.compile(r"^[0-9A-Za-z]{7}$")
 
 
@@ -24,7 +23,6 @@ class ServerCase(unittest.TestCase):
         return body
 
 
-@unittest.skip(PENDING)
 class ShortenContract(ServerCase):
     """AC-1"""
 
@@ -36,7 +34,6 @@ class ShortenContract(ServerCase):
         self.assertTrue(body["short_url"].endswith("/" + body["code"]))
 
 
-@unittest.skip(PENDING)
 class FollowContract(ServerCase):
     """AC-2"""
 
@@ -47,7 +44,6 @@ class FollowContract(ServerCase):
         self.assertEqual(headers["location"], "https://example.com/b")
 
 
-@unittest.skip(PENDING)
 class NotFoundContract(ServerCase):
     """AC-3"""
 
@@ -59,7 +55,6 @@ class NotFoundContract(ServerCase):
                 self.assertIn("error", body)
 
 
-@unittest.skip(PENDING)
 class InvalidURLContract(ServerCase):
     """AC-4"""
 
@@ -84,7 +79,6 @@ class InvalidURLContract(ServerCase):
         self.assertIn("error", payload)
 
 
-@unittest.skip(PENDING)
 class IdempotentContract(ServerCase):
     """AC-5"""
 
@@ -95,7 +89,6 @@ class IdempotentContract(ServerCase):
         self.assertEqual(first[2]["code"], second[2]["code"])
 
 
-@unittest.skip(PENDING)
 class StatsContract(ServerCase):
     """AC-6"""
 
@@ -111,7 +104,6 @@ class StatsContract(ServerCase):
         self.assertIn("created_at", body)
 
 
-@unittest.skip(PENDING)
 class HealthContract(ServerCase):
     """AC-7"""
 
